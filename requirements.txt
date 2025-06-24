@@ -4,3 +4,8 @@ langgraph
 langchain-openai
 python-dotenv
 pydantic
+requests
+gradio
+fastapi
+langgraph-checkpoint-sqlite
+types-requests

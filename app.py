@@ -1,49 +1,92 @@
 import streamlit as st
-import uuid
-from workflow import TravelWorkflow
+from workflow import react_agent
+from langchain_core.messages import HumanMessage
 
-# from services import QueryAnalyzer # etc.
-# from models import TripPlan
-# from langgraph.graph import StateGraph, END
+st.set_page_config(page_title="AI Travel Agent", page_icon="✈️")
+st.title("AI Travel Agent ✈️")
 
-st.title("AI Travel Agent")
+if "chat_history" not in st.session_state:
+  st.session_state.chat_history = []
 
-# Initialize workflow and session state
-if "workflow" not in st.session_state:
-  st.session_state.workflow = TravelWorkflow()
-if "messages" not in st.session_state:
-  st.session_state.messages = []
-if "thread_id" not in st.session_state:
-  st.session_state.thread_id = str(uuid.uuid4())
+# Chat display
+for msg in st.session_state.chat_history:
+  if msg["role"] == "user":
+    st.chat_message("user").write(msg["content"])
+  else:
+    st.chat_message("assistant").write(msg["content"])
 
-# Display chat history
-for message in st.session_state.messages:
-  with st.chat_message(message["role"]):
-    st.markdown(message["content"])
+# User input
+user_input = st.chat_input("Where do you want to travel?")
+if user_input:
+  st.session_state.chat_history.append({"role": "user", "content": user_input})
+  messages = [
+    HumanMessage(content=m["content"]) if m["role"] == "user" else None
+    for m in st.session_state.chat_history
+  ]
+  messages = [m for m in messages if m is not None]
 
-# Handle user input
-if prompt := st.chat_input("Where do you want to go?"):
-  st.session_state.messages.append({"role": "user", "content": prompt})
-  with st.chat_message("user"):
-    st.markdown(prompt)
+  # Show all steps in a status box
+  with st.status("Agent reasoning (all steps shown below):", expanded=True) as status:
+    final = None
+    for event in react_agent.stream({"messages": messages}):
+      if "messages" not in event:
+        continue  # Skip events without messages
+      step_msgs = event["messages"]
+      for m in step_msgs:
+        # Show tool calls
+        if hasattr(m, "tool_calls") and m.tool_calls:
+          for call in m.tool_calls:
+            st.write(f"**Tool Call:** {call['name']}({call['args']})")
+        # Show LLM thoughts
+        elif getattr(m, "type", None) == "ai":
+          st.write(f"**LLM Thought:** {m.content}")
+        # Show tool outputs
+        elif getattr(m, "type", None) == "tool":
+          st.write(f"**Tool Output:** {m.content}")
+        else:
+          st.write(f"**Message:** {m.content}")
+      final = step_msgs[-1].content if step_msgs else None
+    if final:
+      st.session_state.chat_history.append({"role": "assistant", "content": final})
+      st.chat_message("assistant").write(final)
+    status.update(label="Agent finished", state="complete")
 
-  with st.chat_message("assistant"):
-    message_placeholder = st.empty()
-    full_response = ""
+#%%
+from workflow import react_agent
+from langchain_core.messages import HumanMessage
 
-    # Run the workflow and stream the response
-    workflow = st.session_state.workflow
-    thread_id = st.session_state.thread_id
-    events = workflow.run(prompt, thread_id)
+print("AI Travel Agent CLI Debugger\nType 'exit' to quit.\n")
+chat_history = []
 
-    for event in events:
-      # The event stream contains different types of data
-      # We're interested in the messages from the 'query_analyzer' node
-      if "messages" in event.get("query_analyzer", {}):
-        response_messages = event["query_analyzer"]["messages"]
-        for message in response_messages:
-          full_response += message.content
-          message_placeholder.markdown(full_response + "▌")
+while True:
+  user_input = input("You: ")
+  if user_input.strip().lower() in {"exit", "quit"}:
+    break
+  chat_history.append({"role": "user", "content": user_input})
+  messages = [
+    HumanMessage(content=m["content"]) if m["role"] == "user" else None
+    for m in chat_history
+  ]
+  messages = [m for m in messages if m is not None]
 
-    message_placeholder.markdown(full_response)
-  st.session_state.messages.append({"role": "assistant", "content": full_response})
+  print("\n--- Agent Reasoning Steps ---")
+  final = None
+  for event in react_agent.stream({"messages": messages}):
+    if "messages" not in event:
+      continue
+    step_msgs = event["messages"]
+    for m in step_msgs:
+      if hasattr(m, "tool_calls") and m.tool_calls:
+        for call in m.tool_calls:
+          print(f"[Tool Call] {call['name']}({call['args']})")
+      elif getattr(m, "type", None) == "ai":
+        print(f"[LLM Thought] {m.content}")
+      elif getattr(m, "type", None) == "tool":
+        print(f"[Tool Output] {m.content}")
+      else:
+        print(f"[Message] {m.content}")
+    final = step_msgs[-1].content if step_msgs else None
+  if final:
+    chat_history.append({"role": "assistant", "content": final})
+    print(f"\nAgent: {final}\n")
+#%%
