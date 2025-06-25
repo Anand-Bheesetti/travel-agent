@@ -18,7 +18,6 @@ import json
 from pydantic import ValidationError, BaseModel
 from langchain_tavily import TavilySearch
 import re
-from services.user_prompt_agent import extract_user_fields_from_messages
 
 # Instantiate all agents/tools
 query_analyzer = QueryAnalyzer()
@@ -119,52 +118,16 @@ def node_travel_evaluator(state: WorkflowState) -> dict:
   return response
 
 def node_query_analyzer(state: WorkflowState) -> Command:
-  """Analyze the latest user message and update state with extracted trip info. If not travel-related, end."""
+  """Analyze the user message and extract trip info."""
   print("\n---- QUERY ANALYZER ----")
-  print(f"Messages: {state.messages}")
   user_msg = state.messages[-1].content
   result: QueryAnalysisResult = query_analyzer.analyze(str(user_msg))
-  required_fields = ["destination", "budget", "native_currency", "days"]
-  is_empty = all(getattr(result, f, None) in (None, "") for f in required_fields)
-  if is_empty:
-    state.messages.append(AIMessage(content="Sorry, I am a travel agent. Please ask a travel-related question."))
-    return Command(goto=END, update=state)
+  
+  # Merge result into state
   for k, v in result.model_dump().items():
     setattr(state, k, v)
-  state.missing_fields = result.missing_fields
+  
   print(f"Analysis result: {result.model_dump()}")
-  state.messages.append(AIMessage(content=f"Analysis result: {result.model_dump()}"))
-  return Command(goto="check_missing", update=state)
-
-def node_check_missing(state: WorkflowState) -> Command:
-  print("\n---- CHECK MISSING FIELDS ----")
-  required_fields = ["destination", "days", "budget", "native_currency"]
-  missing = [f for f in required_fields if not getattr(state, f, None)]
-  print(f"Missing fields: {missing}")
-  if missing:
-    if len(missing) == len(required_fields):
-      state.messages.append(AIMessage(content="Sorry, I am a travel agent. Please ask a travel-related question."))
-      return Command(goto=END, update=state)
-    state.prompt = f"Please provide: {', '.join(missing)}"
-    state.missing_fields = missing
-    return Command(goto="user_prompt", update=state)
-  state.missing_fields = []
-  return Command(goto="hotel_agent", update=state)
-
-def node_user_prompt(state: WorkflowState) -> Command:
-  print("\n---- USER INPUT FOR MISSING FIELDS (LLM AGENT) ----")
-  try:
-    result, llm_message = extract_user_fields_from_messages(state)
-    for k, v in result.items():
-      if k != "messages" and k in (state.missing_fields or []):
-        setattr(state, k, v)
-    state.messages.append(HumanMessage(content=state.messages[-1].content))
-    state.messages.append(llm_message)
-    print(f"Updated fields: {result}")
-  except Exception as e:
-    state.messages.append(AIMessage(content=f"Failed to extract fields: {e}"))
-    print(f"Failed to extract fields: {e}")
-  state.missing_fields = []
   return Command(goto="hotel_agent", update=state)
 
 def node_hotel_agent(state: WorkflowState) -> Command:
@@ -223,13 +186,31 @@ def node_summary_agent(state: WorkflowState) -> Command:
   })
   state.summary = summary
   print(f"Summary: {summary}")
-  return Command(goto=END, update=state)
+  # Parse for next step signal
+  content = summary.get('summary') if isinstance(summary, dict) else str(summary)
+  match = re.search(r'regenerate:(\w+_agent)', content)
+  if match:
+    next_agent = match.group(1)
+    print(f"Supervisor requests regeneration: {next_agent}")
+    return Command(goto=next_agent, update=state)
+  elif 'final' in content.lower():
+    return Command(goto=END, update=state)
+  else:
+    # Default: end if no clear signal
+    return Command(goto=END, update=state)
+
+def summary_supervisor_router(state: WorkflowState) -> str:
+  content = state.summary.get('summary') if isinstance(state.summary, dict) else str(state.summary)
+  match = re.search(r'regenerate:(\w+_agent)', content)
+  if match:
+    return match.group(1)
+  elif 'final' in content.lower():
+    return END
+  return END
 
 # Build the simplified graph
 workflow = StateGraph(WorkflowState)
 workflow.add_node("query_analyzer", node_query_analyzer)
-workflow.add_node("check_missing", node_check_missing)
-workflow.add_node("user_prompt", node_user_prompt)
 workflow.add_node("hotel_agent", node_hotel_agent)
 workflow.add_node("weather_agent", node_weather_agent)
 workflow.add_node("attractions_agent", node_attractions_agent)
@@ -244,17 +225,19 @@ workflow.add_conditional_edges(
     {"TRAVEL": "query_analyzer", "NOT_TRAVEL": END}
 )
 
-workflow.add_edge("query_analyzer", "check_missing")
-workflow.add_edge("check_missing", "user_prompt")
-workflow.add_edge("check_missing", "hotel_agent")
-workflow.add_edge("user_prompt", "query_analyzer")
+workflow.add_edge("query_analyzer", "hotel_agent")
 workflow.add_edge("hotel_agent", "weather_agent")
 workflow.add_edge("weather_agent", "attractions_agent")
 workflow.add_edge("attractions_agent", "calculator_agent")
 workflow.add_edge("calculator_agent", "itinerary_agent")
 workflow.add_edge("itinerary_agent", "summary_agent")
+workflow.add_conditional_edges("summary_agent", summary_supervisor_router, {
+  "attractions_agent": "attractions_agent",
+  "itinerary_agent": "itinerary_agent",
+  "calculator_agent": "calculator_agent",
+  END: END
+})
 workflow.add_edge("summary_agent", END)
-workflow.add_edge("query_analyzer", END)
 
 app = workflow.compile()
 
