@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from langchain.tools import tool
 
 class AttractionFinder:
@@ -84,4 +84,56 @@ class AttractionFinder:
                 "address": props.get("formatted"),
                 "category": props.get("categories")[0] if props.get("categories") else "unknown"
             })
-        return attractions 
+        return attractions
+
+    @staticmethod
+    @tool
+    def estimate_attractions_cost(destination: str, group_size: int, days: int) -> float:
+        """
+        Estimate average attractions cost using Tavily search.
+
+        Args:
+          destination (str): City or country.
+          group_size (int): Number of people.
+          days (int): Number of days.
+
+        Returns:
+          float: Estimated total attractions cost.
+        """
+        try:
+            from tavily import TavilyClient  # type: ignore
+            api_key = os.getenv("TAVILY_API_KEY")
+            if not api_key:
+                raise ValueError("TAVILY_API_KEY not set.")
+            client = TavilyClient(api_key)
+            response = client.search(
+                query=f"average ticket price for attractions in {destination}",
+                max_results=3,
+                search_depth="advanced"
+            )
+            results = response.get("results", [])
+        except ImportError:
+            # Fallback to requests if SDK not available
+            api_key = os.getenv("TAVILY_API_KEY")
+            if not api_key:
+                raise ValueError("TAVILY_API_KEY not set.")
+            url = "https://api.tavily.com/search"
+            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            payload = {"query": f"average ticket price for attractions in {destination}", "num_results": 3, "search_depth": "advanced"}
+            resp = requests.post(url, headers=headers, json=payload, timeout=15)
+            if resp.status_code != 200:
+                raise ValueError(f"Tavily search failed: {resp.status_code} {resp.text}")
+            data = resp.json()
+            results = data.get("results", [])
+
+        import re
+        price = None
+        for item in results:
+            snippet = item.get("snippet") or item.get("description") or item.get("content") or ""
+            match = re.search(r"([\u20ac$\u00a3])\s?([0-9]{1,4})", snippet)
+            if match:
+                price = float(match.group(2))
+                break
+        if price is None:
+            price = 20.0  # fallback USD
+        return round(price * group_size * days, 2) 

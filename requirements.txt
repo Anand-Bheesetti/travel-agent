@@ -9,3 +9,6 @@ gradio
 fastapi
 langgraph-checkpoint-sqlite
 types-requests
+bs4
+langchain_core
+langchain-tavily

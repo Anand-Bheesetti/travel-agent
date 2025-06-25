@@ -1,39 +1,35 @@
 import os
 from services.llm_utils import get_llm, get_default_prompt
-from typing import List, Dict, Any
+from typing import Any
 
 class ItineraryBuilder:
     """
-    Builds a day-by-day itinerary for a trip using an LLM.
+    Builds a day-by-day itinerary for a trip using an LLM, using the full workflow state.
     """
     def __init__(self):
         self.llm = get_llm()
         system_prompt = (
-            "You are a travel assistant. Given a destination, number of days, a list of attractions, and hotel info, generate a detailed, day-by-day itinerary. Be specific, logical, and concise. Mention both the local and user's currency if possible. If any required info is missing, raise an error."
+            "You are a travel assistant. Given the full state of a trip planning workflow, generate a detailed, day-by-day itinerary. "
+            "Use all available information: destination, number of days, budget, hotels, attractions, weather, group size, preferences, etc. "
+            "If there are too many attractions or activities to fit in the trip, intelligently drop or prioritize them and mention this in your output. "
+            "If any required info is missing, do NOT raise an error. Instead, either use the search tool to find the missing info, or return a message indicating which agent (e.g., hotel, attractions, weather, etc.) should be called to provide the missing info."
         )
-        human_prompt = "Destination: {destination}\nDays: {days}\nAttractions: {attractions}\nHotel Info: {hotel_info}"
+        human_prompt = """
+Trip State:
+{state}
+"""
         self.prompt = get_default_prompt(system_prompt, human_prompt)
 
-    def build(self, destination: str, days: int, attractions: list, hotel_info: dict) -> dict:
+    def build(self, state: Any) -> dict:
         """
-        Generates a detailed, day-by-day itinerary using an LLM.
+        Generates a detailed, day-by-day itinerary using an LLM, given the full workflow state.
 
         Args:
-            destination (str): The city or country for the trip.
-            days (int): Number of days for the trip.
-            attractions (list): List of attractions to include.
-            hotel_info (dict): Information about the hotel.
+            state: The full workflow state (should be serializable as a dict).
 
         Returns:
             dict: Dictionary with the generated itinerary.
         """
-        if not destination or not days or not attractions or not hotel_info:
-            raise ValueError("Missing required trip information for itinerary generation.")
         chain = self.prompt | self.llm
-        result = chain.invoke({
-            "destination": destination,
-            "days": days,
-            "attractions": attractions,
-            "hotel_info": hotel_info
-        })
+        result = chain.invoke({"state": state})
         return {"itinerary": result.content} 

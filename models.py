@@ -44,4 +44,26 @@ class QueryAnalysisResult(TripPlan):
 # default_factory=list means that if missing_fields is not provided
 # when creating a QueryAnalysisResult, it will default to [] (a new, empty list).
 # This avoids potential issues with all instances sharing the same list.
+
+class WorkflowState(TripPlan):
+    """State for the workflow, including conversation history and all planning fields."""
+    messages: list = []
+    hotels: Optional[list] = None
+    attractions: Optional[str] = None
+    weather: Optional[str] = None
+    itinerary: Optional[dict] = None
+    summary: Optional[dict] = None
+    currency_rates: Optional[str] = None
+    missing_fields: Optional[list] = None
+    calculator_result: Optional[str] = None
+    prompt: Optional[str] = None
+
+class HotelInfo(BaseModel):
+    """Minimal hotel info for workflow use."""
+    name: str
+    price_per_night: float
+    review_count: int
+    rating: Optional[float] = None
+    url: Optional[str] = None
+
 #<eof>

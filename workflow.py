@@ -1,68 +1,55 @@
-from services.llm_utils import get_llm
-from services.attractions import AttractionFinder
-from services.weather import WeatherService
-from services.hotels import HotelCalculator
-from services.currency import CurrencyConverter
-from services.itinerary import ItineraryBuilder
-from services.summary import TripSummary
-from services.calculator import Calculator
-from langchain_core.messages import HumanMessage
-from langgraph.prebuilt import create_react_agent
+from services.workflow_nodes import (
+  node_travel_evaluator,
+  node_query_analyzer,
+  node_hotel_agent,
+  node_weather_agent,
+  node_attractions_agent,
+  node_calculator_agent,
+  node_itinerary_agent,
+  node_summary_agent,
+)
+from models import WorkflowState
+from langgraph.graph import StateGraph, START, END
 
-# 1. Instantiate tool classes
-attractions = AttractionFinder()
-weather = WeatherService()
-hotels = HotelCalculator()
-currency = CurrencyConverter()
-itinerary = ItineraryBuilder()
-summary = TripSummary()
-calculator = Calculator()
+# Build the simplified graph
+workflow = StateGraph(WorkflowState)
+workflow.add_node("query_analyzer", node_query_analyzer)
+workflow.add_node("hotel_agent", node_hotel_agent)
+workflow.add_node("weather_agent", node_weather_agent)
+workflow.add_node("attractions_agent", node_attractions_agent)
+workflow.add_node("calculator_agent", node_calculator_agent)
+workflow.add_node("itinerary_agent", node_itinerary_agent)
+workflow.add_node("summary_agent", node_summary_agent)
 
-# 2. Collect all @tool methods (NO itinerary, NO summary)
-TOOLS = [
-  attractions.find_attractions,
-  weather.get_weather,
-  hotels.search_hotels,
-  currency.convert,
-  calculator.add,
-  calculator.multiply,
-  calculator.divide,
-  calculator.subtract
-]
+# Conditional edge for travel_evaluator
+workflow.add_conditional_edges(
+    START,
+    node_travel_evaluator,
+    {"TRAVEL": "query_analyzer", "NOT_TRAVEL": END}
+)
 
-# 3. Get LLM and create react agent
-llm = get_llm()
-react_agent = create_react_agent(llm, tools=TOOLS)
+workflow.add_edge("query_analyzer", "hotel_agent")
+workflow.add_edge("hotel_agent", "weather_agent")
+workflow.add_edge("weather_agent", "attractions_agent")
+workflow.add_edge("attractions_agent", "calculator_agent")
+workflow.add_edge("calculator_agent", "itinerary_agent")
+workflow.add_edge("itinerary_agent", "summary_agent")
+workflow.add_edge("summary_agent", END)
 
-# 4. Main block for CLI/manual test
-# After agent run, call itinerary.build(...) and summary.generate_summary(...)
-def main():
-  print("Travel Agent REACT workflow. Type your query:")
-  while True:
-    user_input = input("You: ")
-    if user_input.lower() in {"exit", "quit"}:
-      break
-    messages = [HumanMessage(content=user_input)]
-    result = react_agent.invoke({"messages": messages})
-    # Gathered info from tools (simulate, or extract from result as needed)
-    # For demo, just use dummy data:
-    trip_info = {
-      "destination": "Paris",
-      "days": 3,
-      "attractions": [{"name": "Louvre"}, {"name": "Eiffel Tower"}],
-      "hotel_info": {"name": "Hotel Paris"}
-    }
-    itinerary_result = itinerary.build(
-      destination=trip_info["destination"],
-      days=trip_info["days"],
-      attractions=trip_info["attractions"],
-      hotel_info=trip_info["hotel_info"]
-    )
-    print("\n--- Itinerary ---")
-    print(itinerary_result["itinerary"])
-    summary_result = summary.generate_summary(trip_info)
-    print("\n--- Summary ---")
-    print(summary_result["summary"])
+app = workflow.compile()
 
+# For CLI/manual test
 if __name__ == "__main__":
-  main()
+  state = WorkflowState(
+    destination=None,
+    budget=None,
+    native_currency=None,
+    days=None,
+    group_size=None,
+    activity_preferences=None,
+    accommodation_type=None,
+    dietary_restrictions=None,
+    transportation_preferences=None,
+    messages=[HumanMessage(content="I want to go to Paris for 3 days, my budget is 1000 EUR, I like art and culture, my currency is USD")]
+  )
+  result = app.invoke(state)

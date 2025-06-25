@@ -13,6 +13,7 @@ class QueryAnalyzer:
       "(destination, budget, native_currency, days) are missing from the user's query. "
       "For budget and days, if a user provides a range, take the maximum value. "
       "If the currency is not specified, assume USD but still list 'native_currency' as a missing field for the user to confirm."
+      "If the user's query is not travel-related, return an empty QueryAnalysisResult."
     )
     human_prompt = "{user_query}"
     self.prompt = get_default_prompt(system_prompt, human_prompt)

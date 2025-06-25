@@ -4,40 +4,55 @@ This project is an AI-powered travel agent that helps users plan trips to any ci
 
 ## Core Architecture
 
-The application is built with a modular and scalable architecture, separating the user interface from the core logic.
-
-- **`app.py`**: The main entry point for the Streamlit user interface. It handles user interactions, chat history, and calls the backend workflow.
-- **`workflow.py`**: Contains the LangGraph implementation. It defines the agent's state, the graph of nodes, and the conditional logic that drives the conversation.
-- **`services.py`**: A collection of Python classes, each responsible for a specific task (e.g., fetching weather, finding attractions, calculating costs). These are the "tools" our agent uses.
-- **`models.py`**: Defines the Pydantic data models (`TripPlan`, `QueryAnalysisResult`) that ensure structured and validated data flows through the system.
+- **`app.py`**: The main entry point for the Streamlit user interface. It handles user interactions, chat history, and calls the backend workflow. You can chat with the agent in your browser.
+- **`workflow.py`**: Contains the LangGraph StateGraph implementation. The workflow is a directed graph of nodes (agents) that process the user's request step by step:
+  - QueryAnalyzer → CheckMissing → UserPrompt (if needed) → HotelAgent → WeatherAgent → AttractionsAgent → CalculatorAgent → ItineraryAgent → SummaryAgent
+  - Each node is a function that updates the shared state and routes to the next node.
+- **`services/`**: Modular Python classes, each responsible for a specific task (e.g., fetching weather, finding attractions, hotel search, currency conversion, calculations). These are the "tools" our agents use.
+- **`models.py`**: Pydantic data models (`TripPlan`, `QueryAnalysisResult`, `WorkflowState`, `HotelInfo`) ensure structured and validated data flows through the system.
 - **`requirements.txt`**: Lists all project dependencies.
 - **`.env`**: Stores sensitive information like API keys. (Note: create this file from `.env.example`).
 
-## Data Flow & Conversational Logic
+## Workflow Diagram
 
-The agent operates in three distinct phases to provide a natural and efficient user experience. The flow is managed by the `TravelWorkflow` in `workflow.py`.
+The workflow is visualized as a directed graph:
 
-### Phase 1: Information Collection
+```mermaid
+flowchart TD
+  UserInput(["User Input"]) --> QueryAnalyzer
+  QueryAnalyzer --> CheckMissing{"Missing Info?"}
+  CheckMissing -- Yes --> UserPrompt(["Ask User for Missing Info"])
+  UserPrompt --> QueryAnalyzer
+  CheckMissing -- No --> HotelAgent
+  HotelAgent --> WeatherAgent
+  WeatherAgent --> AttractionsAgent
+  AttractionsAgent --> CalculatorAgent
+  CalculatorAgent --> ItineraryAgent
+  ItineraryAgent --> SummaryAgent
+  SummaryAgent --> FinalPlan(["Final TripPlan Output"])
+```
 
-1.  **User Input**: The user starts with an initial query (e.g., "I want to go to Paris").
-2.  **Query Analyzer**: The `QueryAnalyzer` node uses an LLM to parse the query and populate the `TripPlan` model. It identifies any essential missing information (`destination`, `days`, `budget`, etc.).
-3.  **Interactive Collector**: If information is missing, the workflow enters a loop, asking the user targeted questions one by one until all required fields in the `TripPlan` state are filled.
+A PNG version of this diagram is also saved in the repository as `workflow.png`.
 
-### Phase 2: Complete Plan Generation
+## Markdown Exporter
 
-1.  **Trip Planner**: Once all necessary information is collected, the workflow triggers a sequence of service calls:
-    - `WeatherService` fetches the forecast.
-    - `AttractionFinder` gets a list of relevant activities.
-    - `HotelCalculator` estimates accommodation costs.
-    - `CurrencyConverter` converts costs to the user's native currency.
-2.  **Itinerary Builder**: The `ItineraryBuilder` takes all the gathered data and constructs a day-by-day itinerary.
-3.  **Summary Generator**: A final summary of the entire trip, including total estimated cost, is generated and presented to the user.
+A new `MarkdownExporter` utility allows you to export the agent's step-by-step reasoning and the final summary to a well-formatted Markdown file. This includes metadata, a disclaimer, and a timestamp. The exporter can be used programmatically to save the agent's output for sharing or documentation.
 
-### Phase 3: Iterative Refinement
+## Using the Chat UI
 
-1.  **User Feedback**: After seeing the complete plan, the user can provide feedback or request changes (e.g., "Can you find a cheaper hotel?", "I'd like to add another day").
-2.  **Plan Router**: The workflow's entry router detects that a complete plan already exists in the agent's state. It routes the new input to a `PlanModifier` node instead of starting from scratch.
-3.  **Plan Modifier**: This node analyzes the user's modification request, updates the `trip_plan` state accordingly, and re-runs only the necessary planning steps (e.g., only re-running the `HotelCalculator` if the budget changes).
-4.  The updated plan is presented, and the user can continue to refine it until they are satisfied.
+1. Run `streamlit run app.py`.
+2. Enter your travel query in the chat box (e.g., "I want to go to Paris for 3 days, my budget is 1000 EUR, I like art and culture, my currency is USD").
+3. The agent will guide you through missing information, fetch hotels, weather, attractions, calculate costs, build an itinerary, and summarize the plan.
+4. You can export the plan to Markdown using the MarkdownExporter.
 
-This cyclical, stateful approach allows for a flexible and powerful conversation, making the planning process collaborative and user-friendly.
+## Outdated Code
+
+- The README and codebase no longer reference `PlanModifier` or `TravelWorkflow` classes. The workflow is now managed by a StateGraph in `workflow.py`.
+- All agent logic is node-based and modular.
+- The chat UI in `app.py` is up to date with the new workflow.
+
+## Additional Notes
+
+- All services are modular and can be extended or replaced.
+- The workflow is fully stateful and supports iterative refinement.
+- For CLI/manual testing, see the bottom of `workflow.py`.
