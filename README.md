@@ -18,14 +18,18 @@ The workflow is visualized as a directed graph:
 
 ```mermaid
 flowchart TD
-  UserInput(["User Input"]) --> QueryAnalyzer
-  QueryAnalyzer --> HotelAgent
-  HotelAgent --> WeatherAgent
-  WeatherAgent --> AttractionsAgent
-  AttractionsAgent --> CalculatorAgent
-  CalculatorAgent --> ItineraryAgent
-  ItineraryAgent --> SummaryAgent
-  SummaryAgent --> FinalPlan(["Final TripPlan Output"])
+  __start__ -->|TRAVEL| query_analyzer
+  __start__ -->|NOT_TRAVEL| __end__
+  query_analyzer --> hotel_agent
+  hotel_agent --> weather_agent
+  weather_agent --> attractions_agent
+  attractions_agent --> calculator_agent
+  calculator_agent --> itinerary_agent
+  itinerary_agent --> summary_agent
+  summary_agent --> __end__
+  summary_agent -.-> attractions_agent
+  summary_agent -.-> calculator_agent
+  summary_agent -.-> itinerary_agent
 ```
 
 A PNG version of this diagram is also saved in the repository as `workflow.png`.
