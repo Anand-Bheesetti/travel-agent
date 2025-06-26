@@ -105,7 +105,7 @@ Today is {_today}. Do not use dates in the past.
 class TravelEvaluationResult(BaseModel):
   result: Literal["TRAVEL", "NOT_TRAVEL"]
 
-def node_travel_evaluator(state: WorkflowState) -> dict:
+def router_travel_evaluator(state: WorkflowState) -> dict:
   """Check if query is travel-related. If not, end conversation."""
   print("\n---- TRAVEL EVALUATOR ----")
   user_msg = state.messages[-1].content
@@ -221,7 +221,7 @@ workflow.add_node("summary_agent", node_summary_agent)
 # Conditional edge for travel_evaluator
 workflow.add_conditional_edges(
     START,
-    node_travel_evaluator,
+    router_travel_evaluator,
     {"TRAVEL": "query_analyzer", "NOT_TRAVEL": END}
 )
 
