@@ -6,7 +6,7 @@ class Calculator:
     """
     @staticmethod
     @tool
-    def add(a: int, b: int) -> int:
+    def add(first_number: int, second_number: int) -> int:
         """
         Add two integers.
 
@@ -17,11 +17,11 @@ class Calculator:
         Returns:
             int: The sum of a and b.
         """
-        return a + b
+        return first_number + second_number
 
     @staticmethod
     @tool
-    def multiply(a: int, b: int) -> int:
+    def multiply(factor1: int, factor2: int) -> int:
         """
         Multiply two integers.
 
@@ -32,11 +32,11 @@ class Calculator:
         Returns:
             int: The product of a and b.
         """
-        return a * b
+        return factor1 * factor2
 
     @staticmethod
     @tool
-    def divide(a: int, b: int) -> float:
+    def divide(numerator: int, denominator: int) -> float:
         """
         Divide two integers.
 
@@ -47,13 +47,13 @@ class Calculator:
         Returns:
             float: The result of division.
         """
-        if b == 0:
+        if denominator == 0:
             raise ValueError("Denominator cannot be zero.")
-        return a / b
+        return numerator / denominator
 
     @staticmethod
     @tool
-    def subtract(a: int, b: int) -> int:
+    def subtract(initial_value: int, value_to_subtract: int) -> int:
         """
         Subtract two integers.
 
@@ -64,4 +64,4 @@ class Calculator:
         Returns:
             int: The subtraction of a and b.
         """
-        return a - b
+        return initial_value - value_to_subtract
