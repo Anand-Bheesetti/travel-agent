@@ -11,11 +11,11 @@ class Calculator:
         Add two integers.
 
         Args:
-            a (int): The first integer.
-            b (int): The second integer.
+            first_number (int): The first integer.
+            second_number (int): The second integer.
 
         Returns:
-            int: The sum of a and b.
+            int: The sum of first_number and second_number.
         """
         return first_number + second_number
 
@@ -26,11 +26,11 @@ class Calculator:
         Multiply two integers.
 
         Args:
-            a (int): The first integer.
-            b (int): The second integer.
+            factor1 (int): The first integer.
+            factor2 (int): The second integer.
 
         Returns:
-            int: The product of a and b.
+            int: The product of factor1 and factor2.
         """
         return factor1 * factor2
 
@@ -41,8 +41,8 @@ class Calculator:
         Divide two integers.
 
         Args:
-            a (int): The numerator.
-            b (int): The denominator (must not be 0).
+            numerator (int): The numerator.
+            denominator (int): The denominator (must not be 0).
 
         Returns:
             float: The result of division.
@@ -58,10 +58,10 @@ class Calculator:
         Subtract two integers.
 
         Args:
-            a (int): The first integer.
-            b (int): The second integer.
+            initial_value (int): The first integer.
+            value_to_subtract (int): The second integer.
 
         Returns:
-            int: The subtraction of a and b.
+            int: The subtraction of initial_value and value_to_subtract.
         """
         return initial_value - value_to_subtract
