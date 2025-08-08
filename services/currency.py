@@ -41,24 +41,4 @@ class CurrencyConverter:
         "to": to_currency.upper(),
         "amount": amount
       }
-    except Exception as e:
-      # Fallback to another public API
-      try:
-        url = f"https://open.er-api.com/v6/latest/{from_currency.upper()}"
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        rates = data.get("rates", {})
-        if to_currency.upper() not in rates:
-          raise ValueError(f"Currency {to_currency} not supported (fallback)")
-        rate = rates[to_currency.upper()]
-        converted_amount = amount * rate
-        return {
-          "converted_amount": round(converted_amount, 2),
-          "rate": rate,
-          "from": from_currency.upper(),
-          "to": to_currency.upper(),
-          "amount": amount
-        }
-      except Exception as e2:
-        raise ValueError(f"Currency conversion failed: {str(e2)}")
+   

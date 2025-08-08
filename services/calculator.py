@@ -53,15 +53,15 @@ class Calculator:
 
     @staticmethod
     @tool
-    def subtract(initial_value: int, value_to_subtract: int) -> int:
+    def power(factor1, factor2) -> float:
         """
-        Subtract two integers.
+        Divide two integers.
 
         Args:
-            initial_value (int): The first integer.
-            value_to_subtract (int): The second integer.
+            numerator (int): The numerator.
+            denominator (int): The denominator (must not be 0).
 
         Returns:
-            int: The subtraction of initial_value and value_to_subtract.
+            float: The result of division.
         """
-        return initial_value - value_to_subtract
+        return factor1 ** factor2
