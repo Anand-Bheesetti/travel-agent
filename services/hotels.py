@@ -100,6 +100,24 @@ class HotelFinder:
       
     except Exception as e:
       raise ValueError(f"API request failed: {str(e)}")
+      
+  @staticmethod
+  @tool
+  def estimate_total_cost(price_per_night: float, total_days: int, guests: int = 1) -> float:
+    """
+    Estimate total hotel cost based on price per night, number of days, and guests.
+
+    Args:
+      price_per_night (float): Price per night of the hotel in USD.
+      total_days (int): Total number of days to stay.
+      guests (int): Number of guests (default is 1).
+
+    Returns:
+      float: Estimated total cost.
+    """
+    if price_per_night <= 0 or total_days <= 0 or guests <= 0:
+      raise ValueError("Invalid input: price, days, and guests must be positive.")
+    return round(price_per_night * total_days * guests, 2)
 
 #   @staticmethod
 #   @tool
